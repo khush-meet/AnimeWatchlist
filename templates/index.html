@@ -1,0 +1,365 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>AniTrack</title>
+<style>
+  :root { --bg:#0f1115; --panel:#181b22; --panel2:#20242d; --text:#e8eaf0; --muted:#9097a6;
+          --accent:#7c5cff; --ok:#2ecc71; --border:#2a2f3a; }
+  * { box-sizing: border-box; }
+  body { margin:0; background:var(--bg); color:var(--text); font-family:system-ui,-apple-system,Segoe UI,Roboto,sans-serif; }
+  header { padding:24px 20px 8px; max-width:1300px; margin:0 auto; }
+  .toprow { display:flex; justify-content:space-between; align-items:center; gap:10px; flex-wrap:wrap; }
+  h1 { margin:0 0 4px; font-size:28px; } h1 span { color:var(--accent); }
+  .user { color:var(--muted); font-size:14px; } .user a { color:var(--accent); text-decoration:none; margin-left:8px; }
+  .stats { color:var(--muted); font-size:14px; }
+  .bar { height:8px; background:var(--panel2); border-radius:99px; margin:12px 0 0; overflow:hidden; }
+  .bar > div { height:100%; width:0; background:linear-gradient(90deg,var(--accent),var(--ok)); transition:width .3s; }
+  .controls { position:sticky; top:0; z-index:5; background:rgba(15,17,21,.92); backdrop-filter:blur(8px); border-bottom:1px solid var(--border); }
+  .controls-inner { max-width:1300px; margin:0 auto; padding:12px 20px; display:flex; flex-wrap:wrap; gap:10px; align-items:center; }
+  input[type=search], input[type=text], input[type=number], select, button { background:var(--panel); color:var(--text); border:1px solid var(--border); border-radius:10px; padding:9px 12px; font-size:14px; font-family:inherit; }
+  input[type=search] { flex:1 1 220px; min-width:160px; }
+  button { cursor:pointer; } button:hover, select:hover { border-color:var(--accent); }
+  button.primary { background:var(--accent); border-color:var(--accent); font-weight:600; }
+  button.danger { background:#3a1d22; border-color:#e5484d; color:#ff8b8f; }
+  label.chk { display:flex; gap:6px; align-items:center; font-size:14px; color:var(--muted); cursor:pointer; }
+  main { max-width:1300px; margin:0 auto; padding:20px; }
+  .count { color:var(--muted); font-size:14px; margin-bottom:14px; }
+  .grid { display:grid; gap:16px; grid-template-columns:repeat(auto-fill,minmax(190px,1fr)); }
+  .card { background:var(--panel); border:1px solid var(--border); border-radius:14px; overflow:hidden; display:flex; flex-direction:column; transition:transform .15s,border-color .15s; }
+  .card:hover { transform:translateY(-3px); border-color:var(--accent); }
+  .card.done { opacity:.6; }
+  .card.done .poster::after { content:"WATCHED"; position:absolute; inset:auto 0 0 0; text-align:center; background:rgba(46,204,113,.9); color:#04210f; font-weight:700; font-size:12px; padding:4px; letter-spacing:1px; }
+  .poster { position:relative; aspect-ratio:2/3; background:var(--panel2); }
+  .poster .ph { position:absolute; inset:0; display:flex; align-items:center; justify-content:center; font-size:42px; font-weight:800; color:rgba(255,255,255,.85);
+                background:linear-gradient(135deg,hsl(var(--h) 60% 35%),hsl(calc(var(--h) + 40) 60% 22%)); }
+  .poster img { position:absolute; inset:0; width:100%; height:100%; object-fit:cover; }
+  .tick { position:absolute; top:8px; right:8px; width:34px; height:34px; border-radius:50%; border:2px solid #fff; background:rgba(0,0,0,.55); color:#fff; font-size:18px; padding:0; display:flex; align-items:center; justify-content:center; z-index:2; }
+  .card.done .tick { background:var(--ok); border-color:var(--ok); color:#04210f; }
+  .badges { position:absolute; top:8px; left:8px; display:flex; flex-direction:column; gap:4px; z-index:2; }
+  .badge { font-size:11px; font-weight:700; padding:3px 7px; border-radius:6px; background:rgba(0,0,0,.65); width:fit-content; }
+  .badge.essential { background:#e5484d; } .badge.recommended { background:var(--accent); } .badge.hindi { background:#f5a623; color:#2b1b00; }
+  .info { padding:10px 12px 12px; display:flex; flex-direction:column; gap:6px; flex:1; }
+  .title { font-weight:650; font-size:14px; line-height:1.3; }
+  .meta { color:var(--muted); font-size:12px; }
+  .genres { display:flex; flex-wrap:wrap; gap:4px; }
+  .genres span { font-size:11px; background:var(--panel2); padding:2px 7px; border-radius:99px; color:var(--muted); }
+  .note { font-size:12px; color:#c9b8ff; }
+  button.edit { align-self:flex-start; padding:5px 12px; font-size:12px; margin-top:auto; }
+  .more { display:block; margin:24px auto; }
+  .empty { text-align:center; color:var(--muted); padding:60px 0; }
+  dialog { background:var(--panel); color:var(--text); border:1px solid var(--border); border-radius:16px; padding:0; width:min(480px,92vw); }
+  dialog::backdrop { background:rgba(0,0,0,.65); }
+  dialog form { padding:20px; display:flex; flex-direction:column; gap:10px; max-height:90vh; overflow:auto; }
+  dialog h2 { margin:0 0 4px; font-size:20px; }
+  dialog label { font-size:13px; color:var(--muted); display:flex; flex-direction:column; gap:4px; }
+  dialog label.row { flex-direction:row; align-items:center; gap:8px; }
+  dialog .two { display:grid; grid-template-columns:1fr 1fr; gap:10px; }
+  dialog .three { display:grid; grid-template-columns:1fr 1fr 1fr; gap:10px; }
+  dialog .hint { font-size:12px; color:var(--muted); }
+  dialog .btns { display:flex; gap:8px; justify-content:flex-end; margin-top:6px; }
+</style>
+</head>
+<body>
+<header>
+  <div class="toprow">
+    <h1>Ani<span>Track</span></h1>
+    <div class="user">{{ username }}{% if is_owner %} (admin){% endif %} <a href="/logout">Log out</a></div>
+  </div>
+  <div class="stats" id="stats"></div>
+  <div class="bar"><div id="barfill"></div></div>
+</header>
+
+<div class="controls"><div class="controls-inner">
+  <input type="search" id="q" placeholder="Search titles...">
+  <select id="genre"><option value="">All genres</option></select>
+  <select id="tier">
+    <option value="">All tiers</option><option value="essential">Essential</option>
+    <option value="recommended">Recommended</option><option value="optional">Optional</option>
+  </select>
+  <select id="kind">
+    <option value="">Series + Movies</option><option value="Series">Series</option><option value="Movie">Movies</option>
+  </select>
+  <select id="sort">
+    <option value="tier">Sort: Best first</option><option value="new">Sort: Newly added</option>
+    <option value="title">Sort: A to Z</option><option value="year">Sort: Newest year</option>
+    <option value="hours">Sort: Shortest</option>
+  </select>
+  <label class="chk"><input type="checkbox" id="hindi"> Hindi dub</label>
+  <label class="chk"><input type="checkbox" id="hidew"> Hide watched</label>
+  <button id="export">Export</button>
+  <button id="import">Import</button>
+  <input type="file" id="file" accept="application/json" hidden>
+  {% if is_owner %}<button class="primary" id="add">+ Add anime</button>{% endif %}
+</div></div>
+
+<main>
+  <div class="count" id="count"></div>
+  <div class="grid" id="grid"></div>
+  <button class="more" id="more" hidden>Load more</button>
+</main>
+
+{% if is_owner %}
+<dialog id="dlg">
+  <form id="form">
+    <h2 id="dlgtitle">Add anime</h2>
+    <input type="hidden" id="f_uid">
+    <label>Name
+      <input type="text" id="f_title" maxlength="200" required>
+    </label>
+    <div class="two">
+      <label>Type
+        <select id="f_kind"><option value="Series">Series</option><option value="Movie">Movie</option></select>
+      </label>
+      <label>Priority
+        <select id="f_tier">
+          <option value="optional">Optional</option>
+          <option value="recommended">Recommended</option>
+          <option value="essential">Must watch</option>
+        </select>
+      </label>
+    </div>
+    <div class="three">
+      <label>Year <input type="number" id="f_year" min="1900" max="2100"></label>
+      <label>Episodes <input type="number" id="f_eps" min="1" max="5000"></label>
+      <label>Minutes each <input type="number" id="f_mins" min="1" max="600"></label>
+    </div>
+    <label>Genres (separate with commas)
+      <input type="text" id="f_genres" placeholder="Action, Fantasy">
+    </label>
+    <label class="row"><input type="checkbox" id="f_hindi"> Hindi dub available</label>
+    <label>Note (optional)
+      <input type="text" id="f_note" maxlength="300" placeholder="Watch season 1 first.">
+    </label>
+    <label>Poster picture from your computer
+      <input type="file" id="f_file" accept="image/*">
+    </label>
+    <label>...or paste a picture link
+      <input type="text" id="f_url" placeholder="https://...">
+    </label>
+    <div class="hint">Episodes and minutes are used to count hours. A new picture replaces the old one.</div>
+    <div class="btns">
+      <button type="button" class="danger" id="f_delete" hidden>Delete</button>
+      <button type="button" id="f_cancel">Cancel</button>
+      <button type="submit" class="primary" id="f_save">Save</button>
+    </div>
+  </form>
+</dialog>
+{% endif %}
+
+<script>
+const TITLES = {{ titles|tojson }};
+const IS_OWNER = {{ 'true' if is_owner else 'false' }};
+const PAGE = 60;
+const TIER_RANK = { essential: 0, recommended: 1, optional: 2 };
+
+const watched = {};
+{{ watched|tojson }}.forEach((u) => (watched[u] = true));
+
+const $ = (id) => document.getElementById(id);
+const esc = (s) => String(s ?? "").replace(/[&<>"']/g, (c) =>
+  ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+const hours = (x) => (x.eps && x.mins) ? (x.eps * x.mins) / 60 : null;
+const hue = (s) => { let h = 0; for (const ch of s) h = (h * 31 + ch.charCodeAt(0)) % 360; return h; };
+const fmtHours = (h) => h == null ? "" : (h < 10 ? h.toFixed(1) : Math.round(h)) + " h";
+const post = (url, body) => fetch(url, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
+
+let shown = PAGE, current = [];
+
+function applyFilters() {
+  const q = $("q").value.trim().toLowerCase();
+  const g = $("genre").value, tier = $("tier").value, kind = $("kind").value;
+  const hindi = $("hindi").checked, hideW = $("hidew").checked, sort = $("sort").value;
+  current = TITLES.filter((x) =>
+    (!q || x.title.toLowerCase().includes(q)) && (!g || x.genres.includes(g)) &&
+    (!tier || x.tier === tier) && (!kind || x.kind === kind) &&
+    (!hindi || x.hindi) && (!hideW || !watched[x.uid]));
+  current.sort((a, b) => {
+    if (sort === "title") return a.title.localeCompare(b.title);
+    if (sort === "year") return (b.year || 0) - (a.year || 0);
+    if (sort === "new") return b.added - a.added;
+    if (sort === "hours") return (hours(a) ?? 1e9) - (hours(b) ?? 1e9);
+    return TIER_RANK[a.tier] - TIER_RANK[b.tier];
+  });
+}
+
+function cardHTML(x) {
+  const meta = [x.kind, x.year, x.eps ? x.eps + " ep" : "", fmtHours(hours(x))].filter(Boolean).join(" · ");
+  const img = x.image ? `<img src="${esc(x.image)}" alt="" loading="lazy" referrerpolicy="no-referrer" onerror="this.remove()">` : "";
+  const badges =
+    (x.tier !== "optional" ? `<span class="badge ${x.tier}">${x.tier === "essential" ? "MUST WATCH" : "RECOMMENDED"}</span>` : "") +
+    (x.hindi ? `<span class="badge hindi">HINDI</span>` : "");
+  const edit = IS_OWNER ? `<button class="edit">Edit</button>` : "";
+  return `
+  <div class="card ${watched[x.uid] ? "done" : ""}" data-uid="${esc(x.uid)}">
+    <div class="poster">
+      <div class="ph" style="--h:${hue(x.title)}">${esc(x.title.trim()[0] || "?")}</div>${img}
+      <div class="badges">${badges}</div>
+      <button class="tick" title="Mark watched" aria-label="Mark watched">✓</button>
+    </div>
+    <div class="info">
+      <div class="title">${esc(x.title)}</div>
+      <div class="meta">${esc(meta)}</div>
+      <div class="genres">${x.genres.map((g) => `<span>${esc(g)}</span>`).join("")}</div>
+      ${x.note ? `<div class="note">${esc(x.note)}</div>` : ""}
+      ${edit}
+    </div>
+  </div>`;
+}
+
+function render() {
+  const slice = current.slice(0, shown);
+  $("grid").innerHTML = slice.length ? slice.map(cardHTML).join("") : `<div class="empty">Nothing matches your filters.</div>`;
+  $("count").textContent = `Showing ${slice.length} of ${current.length} titles`;
+  $("more").hidden = shown >= current.length;
+}
+
+function updateStats() {
+  let done = 0, seen = 0, left = 0;
+  for (const x of TITLES) {
+    const h = hours(x) || 0;
+    if (watched[x.uid]) { done++; seen += h; } else left += h;
+  }
+  $("stats").textContent = `${done} / ${TITLES.length} watched · ${Math.round(seen)} hours watched · about ${Math.round(left)} hours left (where known)`;
+  $("barfill").style.width = TITLES.length ? (done / TITLES.length * 100) + "%" : "0";
+}
+
+function refresh() { shown = PAGE; applyFilters(); render(); }
+
+function setWatched(uid, on, card) {
+  if (on) watched[uid] = true; else delete watched[uid];
+  card.classList.toggle("done", on);
+  updateStats();
+  if ($("hidew").checked) { applyFilters(); render(); }
+}
+
+/* ---------- admin: add / edit form ---------- */
+function openForm(x) {
+  const dlg = $("dlg");
+  if (!dlg) return;
+  const editing = !!x;
+  $("dlgtitle").textContent = editing ? "Edit anime" : "Add anime";
+  $("f_uid").value = editing ? x.uid : "";
+  $("f_title").value = editing ? x.title : "";
+  $("f_kind").value = editing ? x.kind : "Series";
+  $("f_tier").value = editing ? x.tier : "optional";
+  $("f_year").value = editing && x.year ? x.year : "";
+  $("f_eps").value = editing && x.eps ? x.eps : "";
+  $("f_mins").value = editing && x.mins ? x.mins : "";
+  $("f_genres").value = editing ? x.genres.filter((g) => g !== "Unsorted").join(", ") : "";
+  $("f_hindi").checked = editing ? !!x.hindi : true;
+  $("f_note").value = editing ? (x.note || "") : "";
+  $("f_url").value = "";
+  $("f_file").value = "";
+  $("f_delete").hidden = !(editing && x.custom);
+  dlg.showModal();
+}
+
+/* shrink big pictures in the browser so they stay small */
+function shrink(file) {
+  return new Promise((resolve) => {
+    const img = new Image(), url = URL.createObjectURL(file);
+    img.onload = () => {
+      const s = Math.min(1, 500 / img.width, 750 / img.height);
+      const c = document.createElement("canvas");
+      c.width = Math.max(1, Math.round(img.width * s));
+      c.height = Math.max(1, Math.round(img.height * s));
+      c.getContext("2d").drawImage(img, 0, 0, c.width, c.height);
+      c.toBlob((b) => { URL.revokeObjectURL(url); resolve(b || file); }, "image/jpeg", 0.85);
+    };
+    img.onerror = () => resolve(file);
+    img.src = url;
+  });
+}
+
+if (IS_OWNER) {
+  $("add").addEventListener("click", () => openForm(null));
+  $("f_cancel").addEventListener("click", () => $("dlg").close());
+
+  $("form").addEventListener("submit", async (ev) => {
+    ev.preventDefault();
+    const save = $("f_save");
+    save.disabled = true; save.textContent = "Saving...";
+    try {
+      const fd = new FormData();
+      fd.append("uid", $("f_uid").value);
+      fd.append("title", $("f_title").value);
+      fd.append("kind", $("f_kind").value);
+      fd.append("tier", $("f_tier").value);
+      fd.append("year", $("f_year").value);
+      fd.append("eps", $("f_eps").value);
+      fd.append("mins", $("f_mins").value);
+      fd.append("genres", $("f_genres").value);
+      fd.append("hindi", $("f_hindi").checked ? "1" : "0");
+      fd.append("note", $("f_note").value);
+      fd.append("image_url", $("f_url").value);
+      const file = $("f_file").files[0];
+      if (file) fd.append("image", await shrink(file), "poster.jpg");
+      const r = await fetch("/api/title", { method: "POST", body: fd });
+      const j = await r.json().catch(() => ({}));
+      if (r.ok) { location.reload(); return; }
+      if (r.status === 401) { location.href = "/login"; return; }
+      alert(j.error || "Could not save. Please try again.");
+    } catch (err) {
+      alert("Could not save. Check your internet and try again.");
+    }
+    save.disabled = false; save.textContent = "Save";
+  });
+
+  $("f_delete").addEventListener("click", async () => {
+    const uid = $("f_uid").value;
+    if (!uid || !confirm("Delete this anime from the list? This cannot be undone.")) return;
+    const r = await fetch(`/api/title/${encodeURIComponent(uid)}/delete`, { method: "POST" });
+    if (r.ok) location.reload(); else alert("Could not delete.");
+  });
+}
+
+/* ---------- clicks on cards ---------- */
+$("grid").addEventListener("click", async (e) => {
+  const editBtn = e.target.closest(".edit");
+  if (editBtn) {
+    const uid = editBtn.closest(".card").dataset.uid;
+    openForm(TITLES.find((t) => t.uid === uid));
+    return;
+  }
+  const btn = e.target.closest(".tick");
+  if (!btn) return;
+  const card = btn.closest(".card"), uid = card.dataset.uid, on = !watched[uid];
+  setWatched(uid, on, card);
+  try {
+    const r = await post("/api/watch", { uid, on });
+    if (r.status === 401) { location.href = "/login"; return; }
+    if (!r.ok) throw new Error();
+  } catch (err) {
+    setWatched(uid, !on, card);
+    alert("Could not save your tick. Check your internet and try again.");
+  }
+});
+
+["q", "genre", "tier", "kind", "sort", "hindi", "hidew"].forEach((id) =>
+  $(id).addEventListener(id === "q" ? "input" : "change", refresh));
+$("more").addEventListener("click", () => { shown += PAGE; render(); });
+
+$("export").addEventListener("click", () => { location.href = "/api/export"; });
+$("import").addEventListener("click", () => $("file").click());
+$("file").addEventListener("change", async (e) => {
+  const f = e.target.files[0];
+  if (!f) return;
+  try {
+    const r = await post("/api/import", JSON.parse(await f.text()));
+    if (!r.ok) throw new Error();
+    const j = await r.json();
+    alert(`Imported ${j.added} watched titles.`);
+    location.reload();
+  } catch (err) { alert("That file isn't a valid AniTrack export."); }
+  e.target.value = "";
+});
+
+const genreSet = [...new Set(TITLES.flatMap((x) => x.genres))].sort();
+$("genre").insertAdjacentHTML("beforeend", genreSet.map((g) => `<option>${esc(g)}</option>`).join(""));
+updateStats();
+refresh();
+</script>
+</body>
+</html>
